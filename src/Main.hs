@@ -21,7 +21,8 @@ data GzipFile = GzipFile {
         mtime :: Word32,
         xfl :: Word8,
         os :: Word8,
-        fname :: FileName
+        fname :: FileName,
+        block :: BlockHeader
     } deriving Show
 
 readUntilZero :: [Word8] -> Get FileName
@@ -38,6 +39,17 @@ getFileName flg =
     else
         return None
 
+data BlockHeader = BlockHeader {
+        finalBlock :: Bool,
+        compression :: Word8
+    } deriving Show
+
+readBlock = do
+    firstByte <- getWord8
+    let final = (shiftR firstByte 7) == 1
+    let compression = shiftR (clearBit firstByte 7) 5
+    return $ BlockHeader final compression
+
 parseGzip = do
     id1 <- getWord8
     id2 <- getWord8
@@ -47,7 +59,8 @@ parseGzip = do
     xfl <- getWord8
     os <- getWord8
     fname <- getFileName flg
-    return (GzipFile (Hex8 id1) (Hex8 id2) cm flg mtime xfl os fname)
+    block <- readBlock
+    return (GzipFile (Hex8 id1) (Hex8 id2) cm flg mtime xfl os fname block)
 {-    xbytes <- readXBytes flg
     fextra <- readFExtra flg
     fname <- readFName flg
